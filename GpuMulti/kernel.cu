@@ -1,18 +1,17 @@
-#include <iostream>
+п»ї#include <iostream>
 #include "FuncRow.h"
 #include "Matrix.h"
 #include <functional>
-#include <thread>
 
 const float PI = 3.1415926f;
 
 typedef  std::function<Matrix(float x)> CoeffMatrixCounter;
 typedef std::function<float(float)> Function;
 
-//места для распараллеливания: гетУ вычисления матриц f(x)
-//интеграл симпсона суммирование матриц
-// в мульте возможно разбить на зоны
-// в дифсквере сомнительно но можно попробовать
+//РјРµСЃС‚Р° РґР»СЏ СЂР°СЃРїР°СЂР°Р»Р»РµР»РёРІР°РЅРёСЏ: РіРµС‚РЈ РІС‹С‡РёСЃР»РµРЅРёСЏ РјР°С‚СЂРёС† f(x)
+//РёРЅС‚РµРіСЂР°Р» СЃРёРјРїСЃРѕРЅР° СЃСѓРјРјРёСЂРѕРІР°РЅРёРµ РјР°С‚СЂРёС†
+// РІ РјСѓР»СЊС‚Рµ РІРѕР·РјРѕР¶РЅРѕ СЂР°Р·Р±РёС‚СЊ РЅР° Р·РѕРЅС‹
+// РІ РґРёС„СЃРєРІРµСЂРµ СЃРѕРјРЅРёС‚РµР»СЊРЅРѕ РЅРѕ РјРѕР¶РЅРѕ РїРѕРїСЂРѕР±РѕРІР°С‚СЊ
 
 struct Piece {
 	float a;
@@ -24,41 +23,18 @@ struct Cond {
 	float y2;
 };
 
-int getYcount = 0;
-
-
 float prec2 = 10000000;
 
 Matrix* GetY(CoeffMatrixCounter f, Piece piece, int numbOfPieces) {
-	Matrix* Y = new Matrix[numbOfPieces + 1];
 	float h = (piece.b - piece.a) / numbOfPieces;
-	auto lambda = [Y,h](CoeffMatrixCounter f, Piece piece, int numbOfPieces, int beg, int end) {
-		//float h = (piece.b - piece.a) / numbOfPieces;
 
-		float x = piece.a;
-		for (int i = beg; i < end; ++i) {
-			Y[i] = f(x);
-			x += h;
-			//std::cout << std::string(Y[i]) << "\n\n\n";
-		}
-	};
-
-
-
-	Piece firstHalf = { piece.a, (piece.a + piece.b) / 2 };
-	Piece secondHalf = { firstHalf.b + h, piece.b };
-
-	//std::cout << "Поток " << getYcount << " в гетУ запущен\n";
-	std::thread a(lambda, f, firstHalf , numbOfPieces / 2, 0, numbOfPieces / 2);
-	++getYcount;
-	//std::cout << "Поток " << getYcount << " в гетУ завершен\n";
-
-	lambda(f, secondHalf, numbOfPieces + 1 - numbOfPieces/2, numbOfPieces / 2, numbOfPieces + 1);
-	//std::cout << "Поток " << getYcount << " в гетУ запущен\n";
-	//++getYcount;
-	a.join();
-	//b.join();
-	//std::cout << "Поток " << getYcount << " в гетУ завершен\n";
+	float x = piece.a;
+	Matrix* Y = new Matrix[numbOfPieces + 1];
+	for (int i = 0; i < numbOfPieces + 1; ++i) {
+		Y[i] = f(x);
+		x += h;
+		//std::cout << std::string(Y[i]) << "\n\n\n";
+	}
 
 	return Y;
 }
@@ -86,46 +62,24 @@ Generator Anis(Cond cond, Piece piece) {
 }
 
 Matrix IntSimpson(CoeffMatrixCounter f, int numbOfPieces, Piece piece) {
-	Matrix* Y = GetY(f, piece,
-		numbOfPieces); //должен возвращать матрицы квадрата невязки (возвращает то что возвращает и не ебет)
 	float h = (piece.b - piece.a) / numbOfPieces;
+	//Matrix* Y = GetY(f, piece, numbOfPieces);
+	float x = piece.a;
+	//Matrix* Y = new Matrix[numbOfPieces + 1];
+	Matrix s = f(x) + f(piece.b);
+	x += h;
+	for (int i = 0; i < numbOfPieces; ++i) {
+		if (i % 2 == 0) s += f(x) * 2;
+		else s += f(x) * 4;
+		x += h;
+	}
 
-	Matrix s = Y[0] + Y[numbOfPieces];
-	Matrix sumOfEven(s.getRows(), s.getColumns());
-	Matrix sumOfNotEven(s.getRows(), s.getColumns());
-
-	auto ev = [numbOfPieces, Y](Matrix* s) {
-		for (int i = 2; i < numbOfPieces; i += 2) {
-			(*s) += Y[i] * 2;
-		}
-	};
-
-	auto notev = [numbOfPieces, Y](Matrix* s) {
-		for (int i = 1; i < numbOfPieces; i += 2) {
-			(*s) += Y[i] * 4;
-		}
-	};
-
-	//std::cout << "Поток для суммы четных запущен\n";
-	std::thread ev_thread(ev, &sumOfEven);
-	//std::cout << "Поток для суммы четных завершен\n";
-
-	//std::cout << "Поток для суммы нечетных запущен\n";
-	notev(&sumOfNotEven);
-	ev_thread.join();
-	//notev_thread.join();
-	//std::cout << "Поток для суммы нечетных завершен\n";
-
-
-	s += sumOfEven + sumOfNotEven;
-
-	delete[] Y;
-	return s *(h / 3);
+	return s * h / 3;
 }
 
 //Matrix IntSimpson(CoeffMatrixCounter f, int numbOfPieces, Piece piece) {
 //	Matrix* Y = GetY(f, piece,
-//		numbOfPieces); //должен возвращать матрицы квадрата невязки (возвращает то что возвращает и не ебет)
+//		numbOfPieces); //РґРѕР»Р¶РµРЅ РІРѕР·РІСЂР°С‰Р°С‚СЊ РјР°С‚СЂРёС†С‹ РєРІР°РґСЂР°С‚Р° РЅРµРІСЏР·РєРё (РІРѕР·РІСЂР°С‰Р°РµС‚ С‚Рѕ С‡С‚Рѕ РІРѕР·РІСЂР°С‰Р°РµС‚ Рё РЅРµ РµР±РµС‚)
 //	float h = (piece.b - piece.a) / numbOfPieces;
 //	Matrix s = Y[0] + Y[numbOfPieces];
 //	for (int i = 1; i < numbOfPieces; ++i)
@@ -136,38 +90,16 @@ Matrix IntSimpson(CoeffMatrixCounter f, int numbOfPieces, Piece piece) {
 //	return s * h / 3;
 //}
 
-Matrix Mult(Matrix m1, Matrix m2) {
-
+Matrix Mult(Matrix& m1, Matrix& m2) {
 	Matrix M(m1.getRows(), m1.getColumns());
-
-	auto lambda = [](Matrix* M, Matrix* m1, Matrix* m2, int begi, int endi, int begj, int endj)->void {
-		for (int i = begi; i < endi; ++i)
-			for (int j = begj; j < endj; ++j)
-				M->arr[i][j] = m1->arr[i][i] * m2->arr[j][j];
-	};
-
-	int midi = M.getRows() / 2;
-	int midj = M.getColumns() / 2;
-	//AAAAAA
-	std::thread a(lambda,&M, &m1,&m2, 0, midi, 0, midj);
-	std::thread b(lambda, &M, &m1, &m2, 0, midi, midj, m1.getColumns());
-	std::thread c(lambda, &M, &m1, &m2, midi, m1.getRows(), 0, midj);
-	lambda(& M, & m1, & m2, midi, m1.getRows(), midj, m1.getColumns());
-	//std::thread a(lambda, &M, &m1, &m2, 0, midi, 0, m1.getColumns());
-	//lambda(&M, &m1, &m2, midi, m1.getRows(), 0, m1.getColumns());
-	a.join();
-	b.join();
-	c.join();
-	//d.join();
-
-	/*for (int i = 0; i < m1.getColumns(); ++i)
+	for (int i = 0; i < m1.getColumns(); ++i)
 		for (int j = 0; j < m1.getColumns(); ++j)
-			M.arr[i][j] = m1.arr[i][i] * m2.arr[j][j];*/
+			M.arr[i][j] = m1.arr[i][i] * m2.arr[j][j];
 
 	return M;
 }
 
-Matrix DiffSquare(Matrix& m, int variable) {
+Matrix DiffSquare(Matrix m, int variable) {
 	Matrix M(m);
 
 	for (int i = 0; i < m.getRows(); ++i) {
@@ -195,9 +127,6 @@ float* backMove(Matrix slau) {
 	return x;
 }
 
-
-
-
 FuncRow MnkInt(Function p, Function q, Function f, int numbOfMembers, Generator memb, int numbOfPieces,
 	Piece piece) {
 	FuncRow frow(numbOfMembers, memb);
@@ -208,33 +137,24 @@ FuncRow MnkInt(Function p, Function q, Function f, int numbOfMembers, Generator 
 		static int counter = 0;
 		Matrix A(numbOfMembers, numbOfMembers);
 		//std::cout << std::string(frow) << "\n\n";
-		auto l = [ frow, x, p, q, f](Matrix* A, int beg, int end)->void {
-			for (int i = beg; i < end; ++i) {
-				A->arr[i][i] += frow[i].Diff().Diff().Count(x);
-				//std::cout << i << "th number " << A.arr[i][i] << " ";
-				A->arr[i][i] += frow[i].Diff().Count(x) * p(x);
-				//std::cout << A.arr[i][i] << " ";
-				A->arr[i][i] += frow[i].Count(x) * q(x);
-				//std::cout << A.arr[i][i] << "\nHis pol " << std::string(frow[i]) << "\n";
+		for (int i = 0; i < numbOfMembers; ++i) {
+			A.arr[i][i] += frow[i].Diff().Diff().Count(x);
+			//std::cout << i << "th number " << A.arr[i][i] << " ";
+			A.arr[i][i] += frow[i].Diff().Count(x) * p(x);
+			//std::cout << A.arr[i][i] << " ";
+			A.arr[i][i] += frow[i].Count(x) * q(x);
+			//std::cout << A.arr[i][i] << "\nHis pol " << std::string(frow[i]) << "\n";
 
-			}
-		};
+		}
 
-	
-		std::thread a(l, &A, 0, numbOfMembers / 2);
-		l(& A, numbOfMembers / 2, numbOfMembers);
-		a.join();
-		//b.join();
 
 		A.arr[0][0] -= f(x);
-
 		auto M = Mult(A, A);
-		/*std::cout << std::string(M) << "\n\n";
-		std::cout << "a" << counter <<" = " << "\n";
-		std::cout << std::string(A) << "\n\n\n";*/
+		//std::cout << "A" << counter <<" = " << "\n";
+		//std::cout << std::string(A) << "\n\n\n";
 		++counter;
 		return M;
-	};
+		};
 
 	Matrix intgr = IntSimpson(lambda, numbOfPieces, piece);
 	//std::cout << std::string(intgr) << "\n\n\n";
@@ -249,9 +169,9 @@ FuncRow MnkInt(Function p, Function q, Function f, int numbOfMembers, Generator 
 		matr.arr[i - 1][numbOfMembers - 1] = -(df.arr[i][0] + df.arr[0][i]);
 	}
 
-	//std::cout << "До треуголирования" << std::string(matr) << "\n\n";
+	//std::cout << "Р”Рѕ С‚СЂРµСѓРіРѕР»РёСЂРѕРІР°РЅРёСЏ" << std::string(matr) << "\n\n";
 	matr.ToUpTriangle();
-	//std::cout << "После треуголирования" << std::string(matr) << "\n\n";
+	//std::cout << "РџРѕСЃР»Рµ С‚СЂРµСѓРіРѕР»РёСЂРѕРІР°РЅРёСЏ" << std::string(matr) << "\n\n";
 	float* coeffs = backMove(matr);
 
 	for (int i = 1; i < numbOfMembers; ++i) frow[i] *= coeffs[i - 1];
@@ -261,11 +181,8 @@ FuncRow MnkInt(Function p, Function q, Function f, int numbOfMembers, Generator 
 	return frow;
 }
 
-
-
-
 void ShowDataTest(FuncRow frow, Function ans, Piece piece, int numbOfPoints) {
-	//std::cout << ("Полученный ряд:\n");
+	//std::cout << ("РџРѕР»СѓС‡РµРЅРЅС‹Р№ СЂСЏРґ:\n");
 	//std::cout << (std::string)frow;
 
 	float h = (piece.b - piece.a) / numbOfPoints;
@@ -273,25 +190,25 @@ void ShowDataTest(FuncRow frow, Function ans, Piece piece, int numbOfPoints) {
 	float* delt = new float[numbOfPoints + 1];
 	for (int i = 0; i <= numbOfPoints; ++i, x += h) {
 		delt[i] = abs(frow.Count(x) - ans(x));
-		/*std::cout << myround(x, prec2) <<
-			" Полученное решение : " << myround(frow.Count(x), prec2) <<
-			"   Ответ: " << myround(ans(x), prec2) << "  Невязка: " <<
-			myround(delt[i], prec2) << "\n";*/
+		std::cout << myround(x, prec2) <<
+			" РџРѕР»СѓС‡РµРЅРЅРѕРµ СЂРµС€РµРЅРёРµ : " << myround(frow.Count(x), prec2) <<
+			"   РћС‚РІРµС‚: " << myround(ans(x), prec2) << "  РќРµРІСЏР·РєР°: " <<
+			myround(delt[i], prec2) << "\n";
 	}
 
 	float Norm = 0;
 	for (int i = 0; i < numbOfPoints + 1; ++i) if (Norm < delt[i]) Norm = delt[i];
 	delete[] delt;
-	std::cout << "Норма невязки: " << Norm << "\n";
+	std::cout << "РќРѕСЂРјР° РЅРµРІСЏР·РєРё: " << Norm << "\n";
 }
 
 void dotest(Function p_t, Function q_t, Function f_t, Function lambda, Piece piece,
 	Cond cond, int i, int numbOfMembers, int numbOfPoints) {
-	std::cout << "Интегральный МНК Тестовый пример " << i << "\n";
+	std::cout << "РРЅС‚РµРіСЂР°Р»СЊРЅС‹Р№ РњРќРљ РўРµСЃС‚РѕРІС‹Р№ РїСЂРёРјРµСЂ " << i << "\n";
 	auto beg = clock();
 	FuncRow frow = MnkInt(p_t, q_t, f_t, numbOfMembers, Anis(cond, piece), 30, piece);
 	auto end = clock();
-	std::cout << "Время выполнения " << end - beg << " миллисекунд" << "\n";
+	std::cout << "Р’СЂРµРјСЏ РІС‹РїРѕР»РЅРµРЅРёСЏ " << end - beg << " РјРёР»Р»РёСЃРµРєСѓРЅРґ" << "\n";
 	ShowDataTest(frow, lambda, piece, numbOfPoints);
 }
 
@@ -308,15 +225,15 @@ int main() {
 
 	Piece piece_t = { 0, 1 };
 	Cond cond_t = { -9, -5 };
-	const int numbOfMembers = 1000;
-	const int numbOfPoints = 1000;
+	const int numbOfMembers = 20;
+	const int numbOfPoints = 20;
 	//Function lambda = (x) => { return 0; };
 
 	/*for (int i = 1; i <= 4; ++i) {
 		Polynom pol (i + 2);
 		pol[i + 2] = -1;
 		pol[i] = 1;
-		std::cout << std::string(Anis(cond_t, piece_t)(i)) << " и " << std::string(pol) << std::endl;
+		std::cout << std::string(Anis(cond_t, piece_t)(i)) << " Рё " << std::string(pol) << std::endl;
 	}*/
 
 	dotest(p_t, q_t, f_t, lambda, piece_t, cond_t, i, numbOfMembers, numbOfPoints);
