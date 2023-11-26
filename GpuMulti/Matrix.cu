@@ -1,34 +1,25 @@
 #include "Matrix.h"
 #include <cmath>
 
+#define SIZE _rows * _columns * sizeof(float)
+
 int Matrix::count = 0;
 
 float prec1 = 1000000;
 
 Matrix::Matrix(int rows, int columns) : _rows(rows), _columns(columns) {
-	id = count;
-	++count;
-	arr = new float* [_rows];
-	for (int i = 0; i < _rows; ++i) {
-		arr[i] = new float[_columns];
-		for (int j = 0; j < _columns; ++j)
-			arr[i][j] = 0;
-	}
+	cudaMalloc(&arr, _rows * _columns * sizeof(float));
+}
+
+__global__ void copyFunc(float* dst, float* src) {
+
 }
 
 Matrix::Matrix(const Matrix& other) :Matrix(other._rows, other._columns) {
-	//std::cout << "def copy constructor from " << other.id << " to " << id << "\n";
-	for (int i = 0; i < other._rows; ++i) {
-		for (int j = 0; j < other._columns; ++j) {
-			arr[i][j] = other.arr[i][j];
-		}
-	}
+	cudaMemcpy(arr, other.arr, SIZE, cudaMemcpyDeviceToDevice);
 }
 
 Matrix::Matrix(Matrix&& other) {
-	id = count;
-	//std::cout << "rv copy constructor from " << other.id << " to " << id << "\n";
-	++count;
 	arr = other.arr;
 	_columns = other._columns;
 	_rows = other._rows;
@@ -36,127 +27,119 @@ Matrix::Matrix(Matrix&& other) {
 }
 
 Matrix::Matrix() :_rows(0), _columns(0) {
-	id = count;
-	++count;
-	arr = nullptr;
 }
 
 Matrix& Matrix::operator=(const Matrix& other) {
-	//std::cout << "def copy operator from " << other.id << " to " << id << "\n";
-	for (int i = 0; i < _rows; ++i) {
-		delete[] arr[i];
-	}
-	delete[] arr;
-
-	_rows = other._rows;
-	_columns = other._columns;
-
-	arr = new float* [_rows];
-	for (int i = 0; i < _rows; ++i) {
-		arr[i] = new float[_columns];
-		for (int j = 0; j < _columns; ++j)
-			arr[i][j] = other.arr[i][j];
-	}
-
-	return *this;
+	cudaFree(arr);
+	cudaMalloc(&arr, SIZE);
+	cudaMemcpy(arr, other.arr, SIZE, cudaMemcpyDeviceToDevice);
 }
 
 Matrix::~Matrix() {
-	//std::cout << "deleting matrix " << id << "\n";
-	if (arr == nullptr) return;
-	for (int i = 0; i < _rows; ++i) {
-		delete[] arr[i];
-	}
-	delete[] arr;
+	cudaFree(arr);
+}
+
+__device__ void addMatrix(float* dst, float* src, int _rows, int _columns) {
+	int i = blockIdx.x * _columns + threadIdx.x;
+	dst[i] += src[i];
 }
 
 Matrix& Matrix::operator+=(const Matrix& other) {
-	for (int i = 0; i < _rows; ++i) {
-		for (int j = 0; j < _columns; ++j) {
-			arr[i][j] += other.arr[i][j];
-		}
-	}
-
+	addMatrix <<<_rows, _columns >>> (arr, other._arr, _rows, _columns);
+	cudaDeviceSynchronize();
 	return *this;
-
 }
 
 Matrix Matrix::operator+(const Matrix& other) {
-	Matrix ret(*this);
+	Matrix m (*this);
 
-	return ret += other;
+	return m += other;
 }
-//
-//Matrix& Matrix::operator=*(const Matrix& other) {
-//	Matrix matrixNew = Matrix(_rows, other._columns);
-//	for (int i = 0; i < matrixNew._rows; ++i)
-//		for (int j = 0; j < matrixNew._columns; ++j)
-//			for (int r = 0; r < _columns; ++r)
-//				matrixNew.arr[i][j] += arr[i][r] * other.arr[r][j];
-//	return matrixNew;
-//}
+
+__device__ void multOnFloat(float* src, float l, int _rows, int _columns) {
+	src[blockIdx.x * _columns + threadIdx.x] *= l;
+}
 
 Matrix& Matrix::operator*=(float l) {
-	for (int i = 0; i < _rows; ++i) {
-		for (int j = 0; j < _columns; ++j) {
-			arr[i][j] *= l;
-		}
-	}
-
-	return *this;
+	multOnFloat<<<_rows, _columns>>>(arr, l, _rows, _columns);
+	cudaDeviceSynchronize();
+	return* this;
 }
 
 Matrix Matrix::operator*(float l) {
-	Matrix ret(*this);
-	return ret *= l;
+	Matrix m(*this);
+
+	return m *= l;
+}
+
+__device__ void divOnFloat(float* src, float l, int _rows, int _columns) {
+	src[blockIdx.x * _columns + threadIdx.x] /= l;
 }
 
 Matrix& Matrix::operator/=(float l) {
-	for (int i = 0; i < _rows; ++i) {
-		for (int j = 0; j < _columns; ++j) {
-			arr[i][j] /= l;
-		}
-	}
-
-	return *this;
+	divOnFloat <<<_rows, _columns >>> (arr, l, _rows, _columns);
+	cudaDeviceSynchronize();
+	return*this;
 }
 
 Matrix Matrix::operator/(float l) {
-	Matrix ret(*this);
-	return ret /= l;
+	Matrix m(*this);
+
+	return m /= l;
 }
 
 Matrix& Matrix::operator=(Matrix&& other) {
-	//std::cout << "rv copy operator from " << other.id << " to " << id << "\n";
-	int i = 0;
-	int j = 0;
-	delete[] arr;
+	cudaFree(arr);
 	arr = other.arr;
-	arr[i][i] = arr[j][j];
 	_columns = other._columns;
 	_rows = other._rows;
 	other.arr = nullptr;
-
-	return *this;
 }
 
 
+__global__ void multRow(float* src, int row, float l, int rows, int columns) {
+	int i = row * columns + threadIdx.x;
+	src[i] *= l;
+}
+
 void Matrix::MultiplyRow(int row, float l) {
-	for (int i = 0; i < _columns; ++i) arr[row][i] *= l;
+	multRow << <1, _columns >> > (arr, row, l,_rows, _columns);
+	cudaDeviceSynchronize();
+}
+
+__global__ void plusRows(float* src, int rowDst, int rowSrc, int rows, int columns) {
+	int i = rowDst * columns + threadIdx.x;
+	int i1 = rowSrc * columns + threadIdx.x;
+	src[i] += src[i1];
 }
 
 void Matrix::PlusRows(int row1, int row2) {
-	for (int i = 0; i < _columns; ++i) arr[row1][i] += arr[row2][i];
+	plusRows << <1, _columns >> > (arr, row1, row2, _rows, _columns);
+	cudaDeviceSynchronize();
+}
+
+__global__ void minusRows(float* src, int rowDst, int rowSrc, int rows, int columns) {
+	int i = rowDst * columns + threadIdx.x;
+	int i1 = rowSrc * columns + threadIdx.x;
+	src[i] -= src[i1];
 }
 
 void Matrix::MinusRows(int row1, int row2) {
-	for (int i = 0; i < _columns; ++i) arr[row1][i] -= arr[row2][i];
+	minusRows << <1, _columns >> > (arr, row1, row2, _rows, _columns);
+	cudaDeviceSynchronize();
+}
+
+__global__ void swapRows(float* src, int row1, int row2, int rows, int columns) {
+	int i = row1 * columns + threadIdx.x;
+	int i1 = row2 * columns + threadIdx.x;
+	float tmp = src[i];
+	src[i] = src[i1];
+	src[i1] = tmp;
 }
 
 void Matrix::swapLines(int line1, int line2) {
-	float* temp = arr[line1];
-	arr[line1] = arr[line2];
-	arr[line2] = temp;
+	swapRows << <1, _columns >> > (arr, row1, row2, _rows, _columns);
+	cudaDeviceSynchronize();
 }
 
 void Matrix::ToUpTriangle() {

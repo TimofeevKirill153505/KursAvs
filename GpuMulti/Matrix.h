@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
 #include <iostream>
+#include "cuda_runtime.h"
+#include  "device_launch_parameters.h"
 
 class Matrix
 {
@@ -10,7 +12,7 @@ private:
 	static int count;
 	int id;
 public:
-	float** arr = nullptr;
+	float* arr = nullptr;
 	int getColumns() {
 		return _columns;
 	}
