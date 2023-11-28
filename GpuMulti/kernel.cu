@@ -91,40 +91,11 @@ Matrix IntSimpson(CoeffMatrixCounter f, int numbOfPieces, Piece piece) {
 //}
 
 Matrix Mult(Matrix& m1, Matrix& m2) {
-	Matrix M(m1.getRows(), m1.getColumns());
-	for (int i = 0; i < m1.getColumns(); ++i)
-		for (int j = 0; j < m1.getColumns(); ++j)
-			M.arr[i][j] = m1.arr[i][i] * m2.arr[j][j];
-
-	return M;
+	return m1.Multiply(m2);
 }
 
 Matrix DiffSquare(Matrix m, int variable) {
-	Matrix M(m);
-
-	for (int i = 0; i < m.getRows(); ++i) {
-		if (i == variable) continue;
-		for (int j = 0; j < m.getColumns(); ++j) {
-			if (j == variable) continue;
-			M.arr[i][j] = 0;
-		}
-	}
-
-	return M;
-}
-
-float* backMove(Matrix slau) {
-	float* x = new float[slau.getColumns() - 1];
-
-	for (int i = slau.getRows() - 1; i >= 0; --i) {
-		int k = i + 1;
-		float d = slau.arr[i][slau.getColumns() - 1];
-		for (; k < slau.getRows(); ++k) d -= slau.arr[i][k] * x[k];
-
-		x[i] = d;
-	}
-
-	return x;
+	return m.DiffSquare(variable);
 }
 
 FuncRow MnkInt(Function p, Function q, Function f, int numbOfMembers, Generator memb, int numbOfPieces,
@@ -136,43 +107,41 @@ FuncRow MnkInt(Function p, Function q, Function f, int numbOfMembers, Generator 
 		[numbOfMembers, frow, p, q, f](float x)->Matrix {
 		static int counter = 0;
 		Matrix A(numbOfMembers, numbOfMembers);
-		//std::cout << std::string(frow) << "\n\n";
+		std::cout << std::string(frow) << "\n\n";
 		for (int i = 0; i < numbOfMembers; ++i) {
-			A.arr[i][i] += frow[i].Diff().Diff().Count(x);
-			//std::cout << i << "th number " << A.arr[i][i] << " ";
-			A.arr[i][i] += frow[i].Diff().Count(x) * p(x);
-			//std::cout << A.arr[i][i] << " ";
-			A.arr[i][i] += frow[i].Count(x) * q(x);
-			//std::cout << A.arr[i][i] << "\nHis pol " << std::string(frow[i]) << "\n";
+			A.Increase(i,i, frow[i].Diff().Diff().Count(x));
+			std::cout << i << "th number " << A.get(i,i) <<  " delta " << frow[i].Diff().Diff().Count(x) <<" ";
+			A.Increase(i, i, frow[i].Diff().Count(x) * p(x));
+			std::cout << A.get(i, i) << " delta " << frow[i].Diff().Count(x) * p(x) << " ";
+			A.Increase(i, i, frow[i].Count(x) * q(x));
+			std::cout << A.get(i, i) <<  " delta " << frow[i].Count(x) * q(x) << "\n";
 
 		}
 
 
-		A.arr[0][0] -= f(x);
+		A.Increase(0,0, -f(x));
 		auto M = Mult(A, A);
 		//std::cout << "A" << counter <<" = " << "\n";
-		//std::cout << std::string(A) << "\n\n\n";
+		std::cout << std::string(A) << "\n\n\n";
 		++counter;
 		return M;
 		};
 
 	Matrix intgr = IntSimpson(lambda, numbOfPieces, piece);
-	//std::cout << std::string(intgr) << "\n\n\n";
+	std::cout << std::string(intgr) << "\n\n\n";
 
 	Matrix matr(numbOfMembers - 1, numbOfMembers);
 
 	for (int i = 1; i < numbOfMembers; ++i) {
 		Matrix df = DiffSquare(intgr, i);
 
-		for (int j = 1; j < numbOfMembers; ++j) matr.arr[i - 1][j - 1] = df.arr[i][j] + df.arr[j][i];
-
-		matr.arr[i - 1][numbOfMembers - 1] = -(df.arr[i][0] + df.arr[0][i]);
+		matr.CopyDiffToMatrix(df, i);
 	}
 
 	//std::cout << "До треуголирования" << std::string(matr) << "\n\n";
 	matr.ToUpTriangle();
 	//std::cout << "После треуголирования" << std::string(matr) << "\n\n";
-	float* coeffs = backMove(matr);
+	float* coeffs = matr.backMove();
 
 	for (int i = 1; i < numbOfMembers; ++i) frow[i] *= coeffs[i - 1];
 
@@ -212,11 +181,13 @@ void dotest(Function p_t, Function q_t, Function f_t, Function lambda, Piece pie
 	ShowDataTest(frow, lambda, piece, numbOfPoints);
 }
 
-
-
 int main() {
 
 	setlocale(0, "");
+	Matrix A(5, 5);
+	A.Increase(1, 1, -2);
+	std::cout << std::string(A) << "\n\n";
+	A.Increase(2, 2, 2);
 	int i = 1;
 	Function p_t = [](float x)->float { return 0; };
 	Function q_t = [](float x) { return 1; };
@@ -225,8 +196,8 @@ int main() {
 
 	Piece piece_t = { 0, 1 };
 	Cond cond_t = { -9, -5 };
-	const int numbOfMembers = 20;
-	const int numbOfPoints = 20;
+	const int numbOfMembers = 5;
+	const int numbOfPoints = 5;
 	//Function lambda = (x) => { return 0; };
 
 	/*for (int i = 1; i <= 4; ++i) {

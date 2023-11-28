@@ -28,6 +28,9 @@ public:
 	Matrix& operator=(const Matrix& other);
 	~Matrix();
 
+	float get(int i, int j) const;
+	void set(int i, int j, float value);
+
 	Matrix& operator+= (const Matrix& other);
 	Matrix operator+ (const Matrix& other);
 	/*Matrix& operator*=(const Matrix& other);
@@ -43,6 +46,12 @@ public:
 	void MinusRows(int row1, int row2);
 	void swapLines(int line1, int line2);
 	void ToUpTriangle();
+
+	float* backMove();
+	Matrix Multiply(const Matrix& other);
+	Matrix DiffSquare(int variable);
+	void Increase(int i, int j, float inc);
+	void CopyDiffToMatrix(Matrix& diff, int variable);
 
 	operator std::string() const;
 

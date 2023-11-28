@@ -181,7 +181,7 @@ Matrix DiffSquare(Matrix& m, int variable) {
 	return M;
 }
 
-float* backMove(Matrix slau) {
+float* backMove(Matrix& slau) {
 	float* x = new float[slau.getColumns() - 1];
 
 	for (int i = slau.getRows() - 1; i >= 0; --i) {

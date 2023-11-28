@@ -78,6 +78,7 @@ void dotest(int threadCount, int arrSize, int blockCount = 1024, int count = 1) 
 	float* a = new float[arrSize];
 	float* b = new float[arrSize];
 	float* c = new float[arrSize];
+	float time = clock();
 	for (int i = 0; i < arrSize; ++i)
 	{
 		a[i] = i * 2.0f;
@@ -145,9 +146,8 @@ void dotest(int threadCount, int arrSize, int blockCount = 1024, int count = 1) 
 			fprintf(stderr, "cudaEventSynchronize returned error code %d after launching addKernel!\n", cudaStatus);
 
 		}*/
-
-
-
+		//cudaEventElapsedTime(&time, start, stop);
+		//printf_s("threads %i blocks %i arrSize %i time %f", threadCount, blockCount, arrSize, time);
 		// Copy output vector from GPU buffer to host memory.
 		cudaStatus = cudaMemcpy(c, dev_c, memSize, cudaMemcpyDeviceToHost);
 		if (cudaStatus != cudaSuccess) {
@@ -168,9 +168,13 @@ void dotest(int threadCount, int arrSize, int blockCount = 1024, int count = 1) 
 			};
 		}
 	}
+
+	time -= clock();
+	time = -time;
+	time /= count;
 	delete[] a;
 	delete[] b;
-	//printf_s("Time of compute = %f milliseconds blockCount = %i threadCount = %i arrSize = %i\n", blockCount, time, threadCount, arrSize);
+	printf_s("Time of compute = %f milliseconds blockCount = %i threadCount = %i arrSize = %i\n", time, blockCount, threadCount, arrSize);
 
 	delete[] c;
 
@@ -185,35 +189,49 @@ int main() {
 	int threadCount = 1;
 	int blockCount = 1;
 	int arraySize = 10485760;
-	std::cout << "threadCount, blockCount, arraySize\n";
-	std::cin >> threadCount >> blockCount >> arraySize;
-	/*while(threadCount <= 1024){
-		dotest(threadCount, arraySize);
-		threadCount *= 2;
-	}*/
+	//std::cout << "threadCount, blockCount, arraySize\n";
+	//std::cin >> threadCount >> blockCount >> arraySize;
+	///*while(threadCount <= 1024){
+	//	dotest(threadCount, arraySize);
+	//	threadCount *= 2;
+	//}*/
 
-	dotest(threadCount, arraySize, blockCount, 1000);
+	//dotest(threadCount, arraySize, blockCount, 1000);
 
-	printf_s("\n\n");
+	//printf_s("\n\n");
 
-	dotest(5, arraySize);
-	//dotest(10, arraySize);
-	printf_s("\n\n");
-	arraySize = 10240000;
-	threadCount = 1;
-	while (threadCount <= 1024) {
-		dotest(threadCount, arraySize);
-		threadCount *= 10;
+	//dotest(5, arraySize);
+	////dotest(10, arraySize);
+	//printf_s("\n\n");
+	//arraySize = 10240000;
+	//threadCount = 1;
+	//while (threadCount <= 1024) {
+	//	dotest(threadCount, arraySize);
+	//	threadCount *= 10;
+	//}
+	//printf_s("\n\n");
+
+	//dotest(8, arraySize);
+
+	//dotest(20, arraySize);
+	//dotest(40, arraySize);
+	//dotest(80, arraySize);
+	//dotest(1000, arraySize, 1000);
+
+	//printf_s("\n\n\n\n\n");
+	arraySize = 1000000;
+	dotest(1, arraySize, 1000, 1000);
+	dotest(1000, arraySize, 1, 1000);
+	dotest(1000, arraySize, 1000, 1000);
+	float* arr = new float[6]{ 1,2,3,4,5,6 };
+	float time = clock();
+	for (long long i = 0; i < 1000000000; ++i) {
+		arr[i % 6] += arr[(i + 1) % 6];
 	}
-	printf_s("\n\n");
-
-	dotest(8, arraySize);
-
-	dotest(20, arraySize);
-	dotest(40, arraySize);
-	dotest(80, arraySize);
-	dotest(1000, arraySize, 1000);
-
+	time = clock() - time;
+	delete[] arr;
+	time /= 1000;
+	printf_s("Time of compute = %f milliseconds on cpu\n", time);
 	/*cudaDeviceProp prop;
 	cudaGetDeviceProperties_v2(&prop, 0);
 	print_cuda_device_info(prop);*/
