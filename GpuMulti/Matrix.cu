@@ -10,11 +10,18 @@ int Matrix::count = 0;
 
 float prec1 = 1000000;
 
-Matrix::Matrix(int rows, int columns) : _rows(rows), _columns(columns) {
-	
-	ERRORCHECKF( cudaMalloc(&arr, _rows * _columns * sizeof(float)));
-
+__global__ void setZeros(float* arr, int _rows, int _columns) {
+	int i = blockIdx.x;
+	int j = threadIdx.x;
+	arr[i * _columns + j] = 0;
 }
+
+Matrix::Matrix(int rows, int columns) : _rows(rows), _columns(columns) {
+	ERRORCHECKF( cudaMalloc(&arr, _rows * _columns * sizeof(float)));
+	setZeros << <_rows, _columns >> > (arr, _rows, _columns);
+	cudaDeviceSynchronize();
+}
+
 
 Matrix::Matrix(const Matrix& other) :Matrix(other._rows, other._columns) {
 	//cudaMalloc(&arr, SIZE);
@@ -177,25 +184,51 @@ __global__ void currentColumnToZero(int current, float* arr, int _rows, int _col
 }
 
 void Matrix::ToUpTriangle() {
-	for (int i = 0; i < _rows - 1; ++i) {
+	for (int i = 0; i < _rows; ++i) {
 		MultiplyRow(i, 1 / get(i, i));
-		currentColumnToZero << <_rows - i - 1, _columns - i >> > (i, arr, _rows, _columns);
+		if(i != _rows - 1) currentColumnToZero << <_rows - i - 1, _columns - i >> > (i, arr, _rows, _columns);
 		cudaDeviceSynchronize();
+		//std::cout << "из трианг\n" << std::string(*this) << "\n\n";
 	}
 }
 
 __global__ void backMoveFunc(float* x, float* arr, int current, int _rows, int _columns) {
-	int i = current - 1 - threadIdx.x;
+	int i = threadIdx.x;
 	x[i] += x[current] * arr[i * _columns + current];
 }
 
 float* Matrix::backMove(){
 	float* x_d;
 	cudaMalloc(&x_d, sizeof(float) * _rows);
+	setZeros << <1, _rows >> > (x_d, _rows, _columns);
+	cudaDeviceSynchronize();
+	//float* xux = new float[_rows];
+	//cudaMemcpy(xux, x_d, sizeof(float) * _rows, cudaMemcpyDeviceToHost);
+	//for (int g = 0; g < _rows; ++g) std::cout << "x" << g << " = " << xux[g] << " ";
+	//std::cout << "\n";
+	//delete[] xux;
 	for (int i = _rows - 1; i >= 0; --i) {
-		if (i == 0) cudaSet<<<1,1>>>(0, i, x_d, get(i, _columns), _rows, _columns);
-		backMoveFunc << <1, _columns - 1 >> > (x_d, arr, i, _rows, _columns);
+		if (i == _rows - 1) {
+			cudaSet << <1, 1 >> > (0, i, x_d, get(i, _columns - 1), _rows, _columns);
+		}
+		else {
+			float sum = 0.1f;
+			cudaMemcpy(&sum, &(x_d[i]), sizeof(float), cudaMemcpyDeviceToHost);
+
+			//std::cout << i << " col - 1 " << get(i, _columns - 1) << "\n";
+			//std::cout << i << " sum " << sum << "\n";
+
+			cudaSet << <1, 1 >> > (0, i, x_d, get(i, _columns - 1) - sum, _rows, _columns);
+			cudaDeviceSynchronize();
+		}
+
+		if(i != 0 ) backMoveFunc << <1, i >> > (x_d, arr, i, _rows, _columns);
 		cudaDeviceSynchronize();
+		//float* xux = new float[_rows];
+		//cudaMemcpy(xux, x_d, sizeof(float) * _rows, cudaMemcpyDeviceToHost);
+		//for(int g = 0; g < _rows; ++g) std::cout << "x" << g << " = " << xux[g] << " ";
+		//std::cout << "\n";
+		//delete[] xux;
 	}
 	float* x = new float[_rows];
 	cudaMemcpy(x, x_d, sizeof(float) * _rows, cudaMemcpyDeviceToHost);
@@ -217,7 +250,7 @@ Matrix::operator std::string() const {
 __global__ void forMult(float* dst, float* arr1, float* arr2, int _rows, int _columns) {
 	int  i = blockIdx.x;
 	int j = threadIdx.x;
-	dst[i * _columns + j] = arr1[i * _columns + i] + arr2[j * _columns + j];
+	dst[i * _columns + j] = arr1[i * _columns + i] * arr2[j * _columns + j];
 }
 
 Matrix Matrix::Multiply(const Matrix& other) {

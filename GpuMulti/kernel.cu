@@ -68,13 +68,15 @@ Matrix IntSimpson(CoeffMatrixCounter f, int numbOfPieces, Piece piece) {
 	//Matrix* Y = new Matrix[numbOfPieces + 1];
 	Matrix s = f(x) + f(piece.b);
 	x += h;
-	for (int i = 0; i < numbOfPieces; ++i) {
+	//std::cout << std::string(s) << "\n\n";
+	for (int i = 1; i < numbOfPieces; ++i) {
 		if (i % 2 == 0) s += f(x) * 2;
 		else s += f(x) * 4;
 		x += h;
+		
 	}
 
-	return s * h / 3;
+	return s * (h / 3);
 }
 
 //Matrix IntSimpson(CoeffMatrixCounter f, int numbOfPieces, Piece piece) {
@@ -107,14 +109,14 @@ FuncRow MnkInt(Function p, Function q, Function f, int numbOfMembers, Generator 
 		[numbOfMembers, frow, p, q, f](float x)->Matrix {
 		static int counter = 0;
 		Matrix A(numbOfMembers, numbOfMembers);
-		std::cout << std::string(frow) << "\n\n";
+		//std::cout << std::string(frow) << "\n\n";
 		for (int i = 0; i < numbOfMembers; ++i) {
 			A.Increase(i,i, frow[i].Diff().Diff().Count(x));
-			std::cout << i << "th number " << A.get(i,i) <<  " delta " << frow[i].Diff().Diff().Count(x) <<" ";
+			//std::cout << i << "th number " << A.get(i,i) <<  " delta " << frow[i].Diff().Diff().Count(x) <<" ";
 			A.Increase(i, i, frow[i].Diff().Count(x) * p(x));
-			std::cout << A.get(i, i) << " delta " << frow[i].Diff().Count(x) * p(x) << " ";
+			//std::cout << A.get(i, i) << " delta " << frow[i].Diff().Count(x) * p(x) << " ";
 			A.Increase(i, i, frow[i].Count(x) * q(x));
-			std::cout << A.get(i, i) <<  " delta " << frow[i].Count(x) * q(x) << "\n";
+			//std::cout << A.get(i, i) <<  " delta " << frow[i].Count(x) * q(x) << "\n";
 
 		}
 
@@ -122,13 +124,13 @@ FuncRow MnkInt(Function p, Function q, Function f, int numbOfMembers, Generator 
 		A.Increase(0,0, -f(x));
 		auto M = Mult(A, A);
 		//std::cout << "A" << counter <<" = " << "\n";
-		std::cout << std::string(A) << "\n\n\n";
+		//std::cout << std::string(M) << "\n\n\n";
 		++counter;
 		return M;
 		};
 
 	Matrix intgr = IntSimpson(lambda, numbOfPieces, piece);
-	std::cout << std::string(intgr) << "\n\n\n";
+	//std::cout << std::string(intgr) << "\n\n\n";
 
 	Matrix matr(numbOfMembers - 1, numbOfMembers);
 
@@ -138,9 +140,9 @@ FuncRow MnkInt(Function p, Function q, Function f, int numbOfMembers, Generator 
 		matr.CopyDiffToMatrix(df, i);
 	}
 
-	//std::cout << "До треуголирования" << std::string(matr) << "\n\n";
+	//std::cout << "До треуголирования\n" << std::string(matr) << "\n\n";
 	matr.ToUpTriangle();
-	//std::cout << "После треуголирования" << std::string(matr) << "\n\n";
+	//std::cout << "После треуголирования\n" << std::string(matr) << "\n\n";
 	float* coeffs = matr.backMove();
 
 	for (int i = 1; i < numbOfMembers; ++i) frow[i] *= coeffs[i - 1];
@@ -159,10 +161,10 @@ void ShowDataTest(FuncRow frow, Function ans, Piece piece, int numbOfPoints) {
 	float* delt = new float[numbOfPoints + 1];
 	for (int i = 0; i <= numbOfPoints; ++i, x += h) {
 		delt[i] = abs(frow.Count(x) - ans(x));
-		std::cout << myround(x, prec2) <<
-			" Полученное решение : " << myround(frow.Count(x), prec2) <<
-			"   Ответ: " << myround(ans(x), prec2) << "  Невязка: " <<
-			myround(delt[i], prec2) << "\n";
+		//std::cout << myround(x, prec2) <<
+		//	" Полученное решение : " << myround(frow.Count(x), prec2) <<
+		//	"   Ответ: " << myround(ans(x), prec2) << "  Невязка: " <<
+		//	myround(delt[i], prec2) << "\n";
 	}
 
 	float Norm = 0;
@@ -196,8 +198,8 @@ int main() {
 
 	Piece piece_t = { 0, 1 };
 	Cond cond_t = { -9, -5 };
-	const int numbOfMembers = 5;
-	const int numbOfPoints = 5;
+	const int numbOfMembers = 1000;
+	const int numbOfPoints = 1000;
 	//Function lambda = (x) => { return 0; };
 
 	/*for (int i = 1; i <= 4; ++i) {
