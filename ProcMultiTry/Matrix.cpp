@@ -9,18 +9,34 @@ Matrix::Matrix(int rows, int columns) : _rows(rows), _columns(columns) {
 	id = count;
 	++count;
 	arr = new float* [_rows];
-	for (int i = 0; i < _rows; ++i) {
-		arr[i] = new float[_columns];
-		for (int j = 0; j < _columns; ++j)
-			arr[i][j] = 0;
+	float** arrTmp = this->arr;
+	int cols = _columns;
+	int rowst = _rows;
+#pragma omp parallel shared(arrTmp, cols, rowst) //num_threads(8)
+{
+#pragma omp for
+		for (int i = 0; i < rowst; ++i) {
+			arrTmp[i] = new float[cols];
+			for (int j = 0; j < cols; ++j){
+				arrTmp[i][j] = 0;
+			}
+		}
 	}
 }
 
 Matrix::Matrix(const Matrix& other) :Matrix(other._rows, other._columns) {
 	//std::cout << "def copy constructor from " << other.id << " to " << id << "\n";
-	for (int i = 0; i < other._rows; ++i) {
-		for (int j = 0; j < other._columns; ++j) {
-			arr[i][j] = other.arr[i][j];
+	float** arrTmp = this->arr;
+	int cols = _columns;
+	int rows = _rows;
+	float** otharr = other.arr;
+#pragma omp parallel shared(arrTmp, rows, cols, otharr) //num_threads(8)
+	{
+#pragma omp for
+		for (int i = 0; i < rows; ++i) {
+			for (int j = 0; j < cols; ++j) {
+				arrTmp[i][j] = otharr[i][j];
+			}
 		}
 	}
 }
@@ -52,12 +68,19 @@ Matrix& Matrix::operator=(const Matrix& other) {
 	_columns = other._columns;
 
 	arr = new float* [_rows];
-	for (int i = 0; i < _rows; ++i) {
-		arr[i] = new float[_columns];
-		for (int j = 0; j < _columns; ++j)
-			arr[i][j] = other.arr[i][j];
+	float** arrTmp = this->arr;
+	int cols = _columns;
+	int rows = _rows;
+	float** otharr = other.arr;
+#pragma omp parallel shared(arrTmp, rows, cols, otharr) //num_threads(8)
+	{
+#pragma omp for
+		for (int i = 0; i < rows; ++i) {
+			arr[i] = new float[cols];
+			for (int j = 0; j < cols; ++j)
+				arrTmp[i][j] = otharr[i][j];
+		}
 	}
-
 	return *this;
 }
 
@@ -71,9 +94,17 @@ Matrix::~Matrix() {
 }
 
 Matrix& Matrix::operator+=(const Matrix& other) {
-	for (int i = 0; i < _rows; ++i) {
-		for (int j = 0; j < _columns; ++j) {
-			arr[i][j] += other.arr[i][j];
+	float** otharr = other.arr;
+	float** arrTmp = this->arr;
+	int cols = _columns;
+	int rows = _rows;
+#pragma omp parallel shared(arrTmp, otharr, rows, cols) //num_threads(8)
+	{
+#pragma omp for
+		for (int i = 0; i < rows; ++i) {
+			for (int j = 0; j < cols; ++j) {
+				arrTmp[i][j] += otharr[i][j];
+			}
 		}
 	}
 
@@ -97,9 +128,16 @@ Matrix Matrix::operator+(const Matrix& other) {
 //}
 
 Matrix& Matrix::operator*=(float l) {
-	for (int i = 0; i < _rows; ++i) {
-		for (int j = 0; j < _columns; ++j) {
-			arr[i][j] *= l;
+	float** arrTmp = this->arr;
+	int cols = _columns;
+	int rows = _rows;
+#pragma omp parallel shared(arrTmp, l, rows, cols) //num_threads(8)
+	{
+#pragma omp for
+		for (int i = 0; i < rows; ++i) {
+			for (int j = 0; j < cols; ++j) {
+				arrTmp[i][j] *= l;
+			}
 		}
 	}
 
@@ -112,9 +150,16 @@ Matrix Matrix::operator*(float l) {
 }
 
 Matrix& Matrix::operator/=(float l) {
-	for (int i = 0; i < _rows; ++i) {
-		for (int j = 0; j < _columns; ++j) {
-			arr[i][j] /= l;
+	float** arrTmp = this->arr;
+	int cols = _columns;
+	int rows = _rows;
+#pragma omp parallel shared(arrTmp, l, rows, cols) //num_threads(8)
+	{
+#pragma omp for
+		for (int i = 0; i < rows; ++i) {
+			for (int j = 0; j < cols; ++j) {
+				arrTmp[i][j] /= l;
+			}
 		}
 	}
 
@@ -130,9 +175,12 @@ Matrix& Matrix::operator=(Matrix&& other) {
 	//std::cout << "rv copy operator from " << other.id << " to " << id << "\n";
 	int i = 0;
 	int j = 0;
+	for (int i = 0; i < _rows; ++i) {
+		delete[] arr[i];
+	}
 	delete[] arr;
 	arr = other.arr;
-	arr[i][i] = arr[j][j];
+	//arr[i][i] = arr[j][j];
 	_columns = other._columns;
 	_rows = other._rows;
 	other.arr = nullptr;
@@ -142,15 +190,37 @@ Matrix& Matrix::operator=(Matrix&& other) {
 
 
 void Matrix::MultiplyRow(int row, float l) {
-	for (int i = 0; i < _columns; ++i) arr[row][i] *= l;
+	float** arrTmp = this->arr;
+	int cols = _columns;
+	
+#pragma omp parallel shared(arrTmp, row, l, cols)
+	{
+#pragma omp for
+		for (int i = 0; i < cols; ++i) arrTmp[row][i] *= l;
+	}
 }
 
 void Matrix::PlusRows(int row1, int row2) {
-	for (int i = 0; i < _columns; ++i) arr[row1][i] += arr[row2][i];
+	float** arrTmp = this->arr;
+	int cols = _columns;
+	int rows = _rows;
+#pragma omp parallel shared(arrTmp, row1, row2, cols) //num_threads(8)
+	{
+#pragma omp for
+		for (int i = 0; i < cols; ++i) arrTmp[row1][i] += arrTmp[row2][i];
+	}
+	//for (int i = 0; i < _columns; ++i) arr[row1][i] += arr[row2][i];
 }
 
 void Matrix::MinusRows(int row1, int row2) {
-	for (int i = 0; i < _columns; ++i) arr[row1][i] -= arr[row2][i];
+	float** arrTmp = this->arr;
+	int cols = _columns;
+	int rows = _rows;
+#pragma omp parallel shared(arrTmp, row1, l, cols) //num_threads(8)
+	{
+#pragma omp for
+		for (int i = 0; i < cols; ++i) arrTmp[row1][i] -= arrTmp[row2][i];
+	}
 }
 
 void Matrix::swapLines(int line1, int line2) {
@@ -163,13 +233,6 @@ void Matrix::ToUpTriangle() {
 	int min = _rows < _columns ? _rows : _columns;
 
 	for (int i = 0; i < min; ++i) {
-		if (arr[i, i] == 0) break;
-
-		int maxRow = i;
-		for (int j = i + 1; j < _rows; ++j)
-			if (arr[j, i] > arr[maxRow, i] && arr[j, i] != 0) maxRow = j;
-		swapLines(i, maxRow);
-
 
 		MultiplyRow(i, 1 / arr[i][i]);
 		for (int j = i + 1; j < _rows; ++j) {

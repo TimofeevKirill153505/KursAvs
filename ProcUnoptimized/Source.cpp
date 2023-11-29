@@ -62,15 +62,16 @@ Generator Anis(Cond cond, Piece piece) {
 }
 
 Matrix IntSimpson(CoeffMatrixCounter f, int numbOfPieces, Piece piece) {
-	Matrix* Y = GetY(f, piece,
-		numbOfPieces); //должен возвращать матрицы квадрата невязки (возвращает то что возвращает и не ебет)
+	/*Matrix* Y = GetY(f, piece, numbOfPieces);*/ //должен возвращать матрицы квадрата невязки (возвращает то что возвращает и не ебет)
 	float h = (piece.b - piece.a) / numbOfPieces;
-	Matrix s = Y[0] + Y[numbOfPieces];
-	for (int i = 1; i < numbOfPieces; ++i)
-		if (i % 2 == 0) s += Y[i] * 2;
-		else s += Y[i] * 4;
+	float x = piece.a + h;
+	Matrix s = f(piece.a) + f(piece.b);
+	for (int i = 1; i < numbOfPieces; ++i) {
+		if (i % 2 == 0) s += f(x) * 2;
+		else s += f(x) * 4;
+		x += h;
+	}
 
-	delete[] Y;
 	return s * h / 3;
 }
 
@@ -141,7 +142,7 @@ FuncRow MnkInt(Function p, Function q, Function f, int numbOfMembers, Generator 
 	};
 
 	Matrix intgr = IntSimpson(lambda, numbOfPieces, piece);
-	//std::cout << std::string(intgr) << "\n\n\n";
+	std::cout << std::string(intgr) << "\n\n\n";
 
 	Matrix matr(numbOfMembers - 1, numbOfMembers);
 
@@ -209,8 +210,8 @@ int main() {
 
 	Piece piece_t = { 0, 1 };
 	Cond cond_t = {- 9, -5};
-	const int numbOfMembers = 20;
-	const int numbOfPoints = 20;
+	const int numbOfMembers = 5;
+	const int numbOfPoints = 5;
 	//Function lambda = (x) => { return 0; };
 
 	/*for (int i = 1; i <= 4; ++i) {

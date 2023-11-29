@@ -1,8 +1,7 @@
 #pragma once
 #include <string>
 #include <iostream>
-#include <thread>
-
+#include <omp.h>
 class Matrix {
 private:
 	int _columns;
