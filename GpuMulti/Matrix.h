@@ -53,6 +53,9 @@ public:
 	void Increase(int i, int j, float inc);
 	void CopyDiffToMatrix(Matrix& diff, int variable);
 
+	void WriteToDiag(float* arr);
+
+
 	operator std::string() const;
 
 };

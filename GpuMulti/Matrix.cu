@@ -202,11 +202,6 @@ float* Matrix::backMove(){
 	cudaMalloc(&x_d, sizeof(float) * _rows);
 	setZeros << <1, _rows >> > (x_d, _rows, _columns);
 	cudaDeviceSynchronize();
-	//float* xux = new float[_rows];
-	//cudaMemcpy(xux, x_d, sizeof(float) * _rows, cudaMemcpyDeviceToHost);
-	//for (int g = 0; g < _rows; ++g) std::cout << "x" << g << " = " << xux[g] << " ";
-	//std::cout << "\n";
-	//delete[] xux;
 	for (int i = _rows - 1; i >= 0; --i) {
 		if (i == _rows - 1) {
 			cudaSet << <1, 1 >> > (0, i, x_d, get(i, _columns - 1), _rows, _columns);
@@ -294,4 +289,21 @@ void Matrix::CopyDiffToMatrix(Matrix& diff, int variable){
 	copyDiffToMatrixFunc<<<1, _rows>>>(arr, diff.arr, variable, _rows, _columns);
 	cudaDeviceSynchronize();
 	set(variable - 1, _columns - 1, -(diff.get(variable, 0) + diff.get(0, variable)));
+}
+
+__global__ void writeToDiagFunc(float* dst, float* src, int _rows, int _columns) {
+	int i = threadIdx.x;
+	
+	dst[i * _columns + i] = src[i];
+}
+
+void Matrix::WriteToDiag(float* diagArr){
+	float* src;
+	cudaMalloc(&src, _columns * sizeof(float));
+	cudaMemcpy(src, diagArr, _columns * sizeof(float), cudaMemcpyHostToDevice);
+	
+	writeToDiagFunc << <1, _columns >> > (arr, src, _rows, _columns);
+	cudaDeviceSynchronize();;
+
+	cudaFree(src);
 }

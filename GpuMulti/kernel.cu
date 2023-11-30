@@ -96,7 +96,7 @@ Matrix Mult(Matrix& m1, Matrix& m2) {
 	return m1.Multiply(m2);
 }
 
-Matrix DiffSquare(Matrix m, int variable) {
+Matrix DiffSquare(Matrix& m, int variable) {
 	return m.DiffSquare(variable);
 }
 
@@ -110,18 +110,21 @@ FuncRow MnkInt(Function p, Function q, Function f, int numbOfMembers, Generator 
 		static int counter = 0;
 		Matrix A(numbOfMembers, numbOfMembers);
 		//std::cout << std::string(frow) << "\n\n";
+		float* incArr = new float[numbOfMembers];
 		for (int i = 0; i < numbOfMembers; ++i) {
-			A.Increase(i,i, frow[i].Diff().Diff().Count(x));
+			incArr[i] = frow[i].Diff().Diff().Count(x);
+			//A.Increase(i,i, frow[i].Diff().Diff().Count(x));
 			//std::cout << i << "th number " << A.get(i,i) <<  " delta " << frow[i].Diff().Diff().Count(x) <<" ";
-			A.Increase(i, i, frow[i].Diff().Count(x) * p(x));
+			incArr[i] += frow[i].Diff().Count(x) * p(x);
 			//std::cout << A.get(i, i) << " delta " << frow[i].Diff().Count(x) * p(x) << " ";
-			A.Increase(i, i, frow[i].Count(x) * q(x));
+			incArr[i] += frow[i].Count(x) * q(x);
 			//std::cout << A.get(i, i) <<  " delta " << frow[i].Count(x) * q(x) << "\n";
 
 		}
 
-
-		A.Increase(0,0, -f(x));
+		incArr[0] -= f(x);
+		A.WriteToDiag(incArr);
+		delete[] incArr;
 		auto M = Mult(A, A);
 		//std::cout << "A" << counter <<" = " << "\n";
 		//std::cout << std::string(M) << "\n\n\n";
@@ -199,7 +202,7 @@ int main() {
 	Piece piece_t = { 0, 1 };
 	Cond cond_t = { -9, -5 };
 	const int numbOfMembers = 1000;
-	const int numbOfPoints = 1000;
+	const int numbOfPoints = 50;
 	//Function lambda = (x) => { return 0; };
 
 	/*for (int i = 1; i <= 4; ++i) {
