@@ -1,5 +1,6 @@
 #include "Matrix.h"
 #include <cmath>
+#include <omp.h>
 
 int Matrix::count = 0;
 
@@ -10,11 +11,6 @@ Matrix::Matrix(int rows, int columns) : _rows(rows), _columns(columns) {
 	id = count;
 	++count;
 	arr = new float* [_rows];
-	for (int i = 0; i < _rows; ++i) {
-		arr[i] = new float[_columns];
-		for (int j = 0; j < _columns; ++j)
-			arr[i][j] = 0;
-	}
 }
 
 Matrix::Matrix(const Matrix& other) :Matrix(other._rows, other._columns) {

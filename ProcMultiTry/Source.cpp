@@ -2,6 +2,7 @@
 #include "FuncRow.h"
 #include "Matrix.h"
 #include <functional>
+//#include <thread>
 
 const float PI = 3.1415926f;
 
@@ -13,8 +14,6 @@ typedef std::function<float(float)> Function;
 // в мульте возможно разбить на зоны
 // в дифсквере сомнительно но можно попробовать
 
-
-//TODO –аспараллелить конструктор копировани€ и оператор копировани€
 struct Piece {
 	float a;
 	float b;
@@ -25,21 +24,11 @@ struct Cond {
 	float y2;
 };
 
+int getYcount = 0;
+
+
 float prec2 = 10000000;
 
-Matrix* GetY(CoeffMatrixCounter f, Piece piece, int numbOfPieces) {
-	float h = (piece.b - piece.a) / numbOfPieces;
-
-	float x = piece.a;
-	Matrix* Y = new Matrix[numbOfPieces + 1];
-	for (int i = 0; i < numbOfPieces + 1; ++i) {
-		Y[i] = f(x);
-		x += h;
-		//std::cout << std::string(Y[i]) << "\n\n\n";
-	}
-
-	return Y;
-}
 
 Generator Anis(Cond cond, Piece piece) {
 	return [cond, piece](int i)->Polynom {
@@ -64,36 +53,79 @@ Generator Anis(Cond cond, Piece piece) {
 }
 
 Matrix IntSimpson(CoeffMatrixCounter f, int numbOfPieces, Piece piece) {
-	Matrix* Y = GetY(f, piece,
-		numbOfPieces); //должен возвращать матрицы квадрата нев€зки (возвращает то что возвращает и не ебет)
+	/*Matrix* Y = GetY(f, piece, numbOfPieces);*/ //должен возвращать матрицы квадрата нев€зки (возвращает то что возвращает и не ебет)
 	float h = (piece.b - piece.a) / numbOfPieces;
-	Matrix s = Y[0] + Y[numbOfPieces];
-	for (int i = 1; i < numbOfPieces; ++i)
-		if (i % 2 == 0) s += Y[i] * 2;
-		else s += Y[i] * 4;
+	float x = piece.a + h;
+	Matrix s = f(piece.a) + f(piece.b);
+	Matrix SumOfEven(s.getRows(), s.getColumns());
+	Matrix SumOfUneven(s.getRows(), s.getColumns());
 
-	delete[] Y;
-	return s * h / 3;
+	Matrix* soe = &SumOfEven;
+	Matrix* sou = &SumOfUneven;
+
+#pragma omp parallel shared(soe, sou, f, numbOfPieces) private(x) num_threads(2)
+	{
+		float x = piece.a + h + omp_get_thread_num() * h;
+		for (int i = omp_get_thread_num() + 1; i < numbOfPieces; i += 2) {
+			if (i % 2 == 0) (*soe) += f(x) * 2;
+			else (*sou) += f(x) * 4;
+			x += 2*h;
+		}
+	}
+
+	s += SumOfEven + SumOfUneven;
+
+	return s * (h / 3);
 }
 
-Matrix Mult(Matrix& m1, Matrix& m2) {
+//Matrix IntSimpson(CoeffMatrixCounter f, int numbOfPieces, Piece piece) {
+//	Matrix* Y = GetY(f, piece,
+//		numbOfPieces); //должен возвращать матрицы квадрата нев€зки (возвращает то что возвращает и не ебет)
+//	float h = (piece.b - piece.a) / numbOfPieces;
+//	Matrix s = Y[0] + Y[numbOfPieces];
+//	for (int i = 1; i < numbOfPieces; ++i)
+//		if (i % 2 == 0) s += Y[i] * 2;
+//		else s += Y[i] * 4;
+//
+//	delete[] Y;
+//	return s * h / 3;
+//}
+
+Matrix Mult(Matrix m1, Matrix m2) {
+
 	Matrix M(m1.getRows(), m1.getColumns());
-	for (int i = 0; i < m1.getColumns(); ++i)
-		for (int j = 0; j < m1.getColumns(); ++j)
-			M.arr[i][j] = m1.arr[i][i] * m2.arr[j][j];
+
+	Matrix* _M = &M;
+	Matrix* _m1 = &m1;
+	Matrix* _m2 = &m2;
+	int cols = m1.getColumns();
+	int rows = m1.getRows();
+#pragma omp parallel shared(_M, _m1, _m2, cols, rows)
+	{
+#pragma omp for
+		for (int i = 0; i < cols; ++i)
+			for (int j = 0; j < rows; ++j)
+				_M->arr[i][j] = _m1->arr[i][i] * _m2->arr[j][j];
+	}
 
 	return M;
 }
 
 Matrix DiffSquare(Matrix& m, int variable) {
 	Matrix M(m);
-
-	for (int i = 0; i < m.getRows(); ++i) {
+	int rows = M.getRows();
+	int cols = M.getColumns();
+	Matrix* _M = &M;
+#pragma omp parallel shared(_M, rows, cols, variable)
+	{
+#pragma omp for
+	for (int i = 0; i < rows; ++i) {
 		if (i == variable) continue;
-		for (int j = 0; j < m.getColumns(); ++j) {
+		for (int j = 0; j < cols; ++j) {
 			if (j == variable) continue;
-			M.arr[i][j] = 0;
+			_M->arr[i][j] = 0;
 		}
+	}
 	}
 
 	return M;
@@ -112,6 +144,9 @@ float* backMove(Matrix& slau) {
 
 	return x;
 }
+
+
+
 
 FuncRow MnkInt(Function p, Function q, Function f, int numbOfMembers, Generator memb, int numbOfPieces,
 	Piece piece) {
@@ -147,17 +182,24 @@ FuncRow MnkInt(Function p, Function q, Function f, int numbOfMembers, Generator 
 
 	Matrix matr(numbOfMembers - 1, numbOfMembers);
 
-	for (int i = 1; i < numbOfMembers; ++i) {
-		Matrix df = DiffSquare(intgr, i);
+	int nom = numbOfMembers;
+	Matrix* _matr = &matr;
+	Matrix* _intgr = &intgr;
+#pragma omp parallel shared(nom, _matr, _intgr)
+	{
+#pragma omp for
+		for (int i = 1; i < nom; ++i) {
+			Matrix df = DiffSquare(*(_intgr), i);
 
-		for (int j = 1; j < numbOfMembers; ++j) matr.arr[i - 1][j - 1] = df.arr[i][j] + df.arr[j][i];
+			for (int j = 1; j < nom; ++j) _matr->arr[i - 1][j - 1] = df.arr[i][j] + df.arr[j][i];
 
-		matr.arr[i - 1][numbOfMembers - 1] = -(df.arr[i][0] + df.arr[0][i]);
+			_matr->arr[i - 1][nom - 1] = -(df.arr[i][0] + df.arr[0][i]);
+		}
 	}
 
-	//std::cout << "ƒо треуголировани€" << std::string(matr) << "\n\n";
+	//std::cout << "ƒо треуголировани€\n" << std::string(matr) << "\n\n";
 	matr.ToUpTriangle();
-	//std::cout << "ѕосле треуголировани€" << std::string(matr) << "\n\n";
+	//std::cout << "ѕосле треуголировани€\n" << std::string(matr) << "\n\n";
 	float* coeffs = backMove(matr);
 
 	for (int i = 1; i < numbOfMembers; ++i) frow[i] *= coeffs[i - 1];
@@ -166,6 +208,9 @@ FuncRow MnkInt(Function p, Function q, Function f, int numbOfMembers, Generator 
 
 	return frow;
 }
+
+
+
 
 void ShowDataTest(FuncRow frow, Function ans, Piece piece, int numbOfPoints) {
 	//std::cout << ("ѕолученный р€д:\n");
@@ -211,8 +256,8 @@ int main() {
 
 	Piece piece_t = { 0, 1 };
 	Cond cond_t = { -9, -5 };
-	const int numbOfMembers = 500;
-	const int numbOfPoints = 500;
+	const int numbOfMembers = 1000;
+	const int numbOfPoints = 1000;
 	//Function lambda = (x) => { return 0; };
 
 	/*for (int i = 1; i <= 4; ++i) {
@@ -257,3 +302,38 @@ int main() {
 	dotest(p_t, q_t, f_t, lambda, piece_t, cond_t, i, numbOfMembers, numbOfPoints);
 
 }
+
+//#include <omp.h>
+//
+//#include <iostream>
+
+//int main() {
+//	int i;
+//	int arr[10][10][2];
+//	for (int i = 0; i < 10; ++i) {
+//		for (int j = 0; j < 10; ++j) {
+//			arr[i][j][0] = i * j;
+//
+//			arr[i][j][0] = i;
+//			arr[i][j][1] = 0;
+//		}
+//	}
+//	int arrSize = 10;
+//	--arrSize;
+//	++arrSize;
+//#pragma omp parallel shared(arr)
+//{
+//#pragma omp for
+//	for (int i = 0; i < arrSize; ++i) {
+//		for(int j = 0; j < arrSize; ++j)
+//		arr[i][j][1] = omp_get_thread_num();
+//		}
+//	
+//}
+//	for (int i = 0; i < 10; ++i) {
+//		for(int j = 0; j < 10; ++j)
+//		std::cout << i << ",  " << j << " by thread" << arr[i][j][1] << "\n";
+//	}
+//
+//	return 0;
+//}
