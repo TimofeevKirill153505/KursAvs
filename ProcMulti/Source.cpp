@@ -309,7 +309,7 @@ int main() {
 	Piece piece_t = { 0, 1 };
 	Cond cond_t = { -9, -5 };
 	const int numbOfMembers = 1000;
-	const int numbOfPoints = 1000;
+	const int numbOfPoints = 20;
 	//Function lambda = (x) => { return 0; };
 
 	/*for (int i = 1; i <= 4; ++i) {

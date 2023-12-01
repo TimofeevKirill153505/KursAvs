@@ -11,6 +11,8 @@ private:
 	int _rows;
 	static int count;
 	int id;
+	int _blocksForRow = 0;
+	int _threadsForRow = 0;
 public:
 	float* arr = nullptr;
 	int getColumns() {

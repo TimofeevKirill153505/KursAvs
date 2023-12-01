@@ -127,7 +127,7 @@ FuncRow MnkInt(Function p, Function q, Function f, int numbOfMembers, Generator 
 		delete[] incArr;
 		auto M = Mult(A, A);
 		//std::cout << "A" << counter <<" = " << "\n";
-		//std::cout << std::string(M) << "\n\n\n";
+		//std::cout << std::string(A) << "\n\n\n";
 		++counter;
 		return M;
 		};
@@ -164,10 +164,10 @@ void ShowDataTest(FuncRow frow, Function ans, Piece piece, int numbOfPoints) {
 	float* delt = new float[numbOfPoints + 1];
 	for (int i = 0; i <= numbOfPoints; ++i, x += h) {
 		delt[i] = abs(frow.Count(x) - ans(x));
-		//std::cout << myround(x, prec2) <<
-		//	" Полученное решение : " << myround(frow.Count(x), prec2) <<
-		//	"   Ответ: " << myround(ans(x), prec2) << "  Невязка: " <<
-		//	myround(delt[i], prec2) << "\n";
+		std::cout << myround(x, prec2) <<
+			" Полученное решение : " << myround(frow.Count(x), prec2) <<
+			"   Ответ: " << myround(ans(x), prec2) << "  Невязка: " <<
+			myround(delt[i], prec2) << "\n";
 	}
 
 	float Norm = 0;
@@ -202,7 +202,7 @@ int main() {
 	Piece piece_t = { 0, 1 };
 	Cond cond_t = { -9, -5 };
 	const int numbOfMembers = 1000;
-	const int numbOfPoints = 50;
+	const int numbOfPoints = 20;
 	//Function lambda = (x) => { return 0; };
 
 	/*for (int i = 1; i <= 4; ++i) {

@@ -210,8 +210,8 @@ int main() {
 
 	Piece piece_t = { 0, 1 };
 	Cond cond_t = {- 9, -5};
-	const int numbOfMembers = 5;
-	const int numbOfPoints = 5;
+	const int numbOfMembers = 10;
+	const int numbOfPoints = 20;
 	//Function lambda = (x) => { return 0; };
 
 	/*for (int i = 1; i <= 4; ++i) {
