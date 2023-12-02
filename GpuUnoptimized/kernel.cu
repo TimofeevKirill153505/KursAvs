@@ -73,7 +73,7 @@ Matrix IntSimpson(CoeffMatrixCounter f, int numbOfPieces, Piece piece) {
 		if (i % 2 == 0) s += f(x) * 2;
 		else s += f(x) * 4;
 		x += h;
-		
+
 	}
 
 	return s * (h / 3);
@@ -139,6 +139,7 @@ FuncRow MnkInt(Function p, Function q, Function f, int numbOfMembers, Generator 
 
 	for (int i = 1; i < numbOfMembers; ++i) {
 		Matrix df = DiffSquare(intgr, i);
+		//std::cout << "Производная\n" << std::string(df) << "\n\n";
 
 		matr.CopyDiffToMatrix(df, i);
 	}
@@ -148,10 +149,10 @@ FuncRow MnkInt(Function p, Function q, Function f, int numbOfMembers, Generator 
 	//std::cout << "После треуголирования\n" << std::string(matr) << "\n\n";
 	float* coeffs = matr.backMove();
 
+	//for (int i = 0; i < numbOfMembers - 1; ++i) std::cout << coeffs[i] << "\n";
 	for (int i = 1; i < numbOfMembers; ++i) frow[i] *= coeffs[i - 1];
 
 	delete[] coeffs;
-
 	return frow;
 }
 
@@ -164,10 +165,10 @@ void ShowDataTest(FuncRow frow, Function ans, Piece piece, int numbOfPoints) {
 	float* delt = new float[numbOfPoints + 1];
 	for (int i = 0; i <= numbOfPoints; ++i, x += h) {
 		delt[i] = abs(frow.Count(x) - ans(x));
-		/*std::cout << myround(x, prec2) <<
+		std::cout << myround(x, prec2) <<
 			" Полученное решение : " << myround(frow.Count(x), prec2) <<
 			"   Ответ: " << myround(ans(x), prec2) << "  Невязка: " <<
-			myround(delt[i], prec2) << "\n";*/
+			myround(delt[i], prec2) << "\n";
 	}
 
 	float Norm = 0;
@@ -201,9 +202,8 @@ int main() {
 
 	Piece piece_t = { 0, 1 };
 	Cond cond_t = { -9, -5 };
-	const int numbOfMembers = 200;
-	const int numbOfPoints = 1000;
-
+	const int numbOfMembers = 1000;
+	const int numbOfPoints = 20;
 	//Function lambda = (x) => { return 0; };
 
 	/*for (int i = 1; i <= 4; ++i) {
